@@ -210,6 +210,7 @@ def prepare_df(df):
     df['cap'] = 1  # Placeholder for market cap
     
     # Create all required adv (average daily volume) columns
+    df['adv5'] = adv(df, 5)
     df['adv10'] = adv(df, 10)
     df['adv15'] = adv(df, 15)
     df['adv20'] = adv(df, 20)
@@ -955,33 +956,33 @@ def alpha74(df):
     return inner * -1
 
 def alpha75(df):
-    corr_vwap_vol = ts_correlation(df, 'vwap', 'Volume', 4.24304)
+    corr_vwap_vol = ts_correlation(df, 'vwap', 'Volume', int(4.24304))
     rank_corr = cs_rank(df, corr_vwap_vol)
     rank_low = cs_rank(df, 'Low')
     rank_adv50 = cs_rank(df, 'adv50')
-    corr_rank_low_adv = ts_correlation(df, rank_low, rank_adv50, 12.4413)
+    corr_rank_low_adv = ts_correlation(df, rank_low, rank_adv50, int(12.4413))
     rank_corr2 = cs_rank(df, corr_rank_low_adv)
     return rank_corr < rank_corr2
 
 def alpha76(df):
-    delta_vwap = ts_delta(df, 'vwap', 1.24383)
-    decay_delta = decay_linear(df, delta_vwap, 11.8259)
+    delta_vwap = ts_delta(df, 'vwap', int(1.24383))
+    decay_delta = decay_linear(df, delta_vwap, int(11.8259))
     rank_decay = cs_rank(df, decay_delta)
     neutralized_low = indneutralize(df, 'Low')
-    corr_low_adv = ts_correlation(df, neutralized_low, 'adv81', 8.14941)
-    ts_rank_corr = ts_rank(df, corr_low_adv, 19.569)
-    decay_ts_rank = decay_linear(df, ts_rank_corr, 17.1543)
-    ts_rank_decay2 = ts_rank(df, decay_ts_rank, 19.383)
+    corr_low_adv = ts_correlation(df, neutralized_low, 'adv81', int(8.14941))
+    ts_rank_corr = ts_rank(df, corr_low_adv, int(19.569))
+    decay_ts_rank = decay_linear(df, ts_rank_corr, int(17.1543))
+    ts_rank_decay2 = ts_rank(df, decay_ts_rank, int(19.383))
     inner = np.maximum(rank_decay, ts_rank_decay2)
     return inner * -1
 
 def alpha77(df):
     hl2 = (df['High'] + df['Low']) / 2
     hl2_high = (hl2 + df['High']) - (df['vwap'] + df['High'])
-    decay_hl = decay_linear(df, hl2_high, 20.0451)
+    decay_hl = decay_linear(df, hl2_high, int(20.0451))
     rank_decay = cs_rank(df, decay_hl)
-    corr_hl_adv = ts_correlation(df, hl2, 'adv40', 3.1614)
-    decay_corr = decay_linear(df, corr_hl_adv, 5.64125)
+    corr_hl_adv = ts_correlation(df, hl2, 'adv40', int(3.1614))
+    decay_corr = decay_linear(df, corr_hl_adv, int(5.64125))
     rank_decay2 = cs_rank(df, decay_corr)
     return np.minimum(rank_decay, rank_decay2)
 
@@ -989,13 +990,13 @@ def alpha78(df):
     low_weight = df['Low'] * (1 - 0.352233)
     vwap_weight = df['vwap'] * 0.352233
     weighted = low_weight + vwap_weight
-    sum_weighted = ts_sum(df, weighted, 19.7428)
-    sum_adv40 = ts_sum(df, 'adv40', 19.7428)
-    corr_sum = ts_correlation(df, sum_weighted, sum_adv40, 6.83313)
+    sum_weighted = ts_sum(df, weighted, int(19.7428))
+    sum_adv40 = ts_sum(df, 'adv40', int(19.7428))
+    corr_sum = ts_correlation(df, sum_weighted, sum_adv40, int(6.83313))
     rank_corr = cs_rank(df, corr_sum)
     rank_vwap = cs_rank(df, 'vwap')
     rank_vol = cs_rank(df, 'Volume')
-    corr_rank_vwap_vol = ts_correlation(df, rank_vwap, rank_vol, 5.77492)
+    corr_rank_vwap_vol = ts_correlation(df, rank_vwap, rank_vol, int(5.77492))
     rank_corr2 = cs_rank(df, corr_rank_vwap_vol)
     power = signed_power(df, rank_corr, rank_corr2)
     return power
@@ -1005,11 +1006,11 @@ def alpha79(df):
     open_weight = df['Open'] * 0.60733
     weighted = open_weight + close_weight
     neutralized_weighted = indneutralize(df, weighted)
-    delta_neut = ts_delta(df, neutralized_weighted, 1.23438)
+    delta_neut = ts_delta(df, neutralized_weighted, int(1.23438))
     rank_delta = cs_rank(df, delta_neut)
-    ts_rank_vwap = ts_rank(df, 'vwap', 3.60973)
-    ts_rank_adv150 = ts_rank(df, 'adv150', 9.18637)
-    corr_ts = ts_correlation(df, ts_rank_vwap, ts_rank_adv150, 14.6644)
+    ts_rank_vwap = ts_rank(df, 'vwap', int(3.60973))
+    ts_rank_adv150 = ts_rank(df, 'adv150', int(9.18637))
+    corr_ts = ts_correlation(df, ts_rank_vwap, ts_rank_adv150, int(14.6644))
     rank_corr = cs_rank(df, corr_ts)
     inner = rank_delta < rank_corr
     return inner
@@ -1019,47 +1020,50 @@ def alpha80(df):
     high_weight = df['High'] * 0.868128
     weighted = high_weight + open_weight
     neutralized_weighted = indneutralize(df, weighted)
-    delta_neut = ts_delta(df, neutralized_weighted, 4.04545)
+    delta_neut = ts_delta(df, neutralized_weighted, int(4.04545))
     sign_delta = np.sign(delta_neut)
     rank_sign = cs_rank(df, sign_delta)
-    corr_high_adv = ts_correlation(df, 'High', 'adv10', 5.11456)
-    ts_rank_corr = ts_rank(df, corr_high_adv, 5.53756)
+    corr_high_adv = ts_correlation(df, 'High', 'adv10', int(5.11456))
+    ts_rank_corr = ts_rank(df, corr_high_adv, int(5.53756))
     power = signed_power(df, rank_sign, ts_rank_corr)
     return power * -1
 
 def alpha81(df):
-    sum_adv10 = ts_sum(df, 'adv10', 49.6054)
-    corr_vwap_sum = ts_correlation(df, 'vwap', sum_adv10, 8.47743)
+    sum_adv10 = ts_sum(df, 'adv10', int(49.6054))
+    corr_vwap_sum = ts_correlation(df, 'vwap', sum_adv10, int(8.47743))
     rank_corr = cs_rank(df, corr_vwap_sum)
     power4 = signed_power(df, rank_corr, 4)
-    product_rank = ts_product(df, power4, 14.9655)
+    product_rank = ts_product(df, power4, int(14.9655))
     log_product = np.log(product_rank)
     rank_log = cs_rank(df, log_product)
     rank_vwap = cs_rank(df, 'vwap')
     rank_vol = cs_rank(df, 'Volume')
-    corr_rank_vwap_vol = ts_correlation(df, rank_vwap, rank_vol, 5.07914)
+    corr_rank_vwap_vol = ts_correlation(df, rank_vwap, rank_vol, int(5.07914))
     rank_corr2 = cs_rank(df, corr_rank_vwap_vol)
     inner = rank_log < rank_corr2
     return inner * -1
 
 def alpha82(df):
-    delta_open = ts_delta(df, 'Open', 1.46063)
-    decay_open = decay_linear(df, delta_open, 14.8717)
+    delta_open = ts_delta(df, 'Open', int(1.46063))
+    decay_open = decay_linear(df, delta_open, int(14.8717))
     rank_decay = cs_rank(df, decay_open)
     neutralized_vol = indneutralize(df, 'Volume')
     open_weight = df['Open'] * (1 - 0.634196)
     open_weight2 = df['Open'] * 0.634196
     weighted = open_weight + open_weight2
-    corr_weighted_open = ts_correlation(df, neutralized_vol, weighted, 17.4842)
-    decay_corr = decay_linear(df, corr_weighted_open, 6.92131)
-    ts_rank_decay2 = ts_rank(df, decay_corr, 13.4283)
+    corr_weighted_open = ts_correlation(df, neutralized_vol, weighted, int(17.4842))
+    decay_corr = decay_linear(df, corr_weighted_open, int(6.92131))
+    ts_rank_decay2 = ts_rank(df, decay_corr, int(13.4283))
     return np.minimum(rank_decay, ts_rank_decay2) * -1
 
 def alpha83(df):
     sum_close5 = ts_sum(df, 'Close', 5)
     sum_close5_5 = sum_close5 / 5
     hl_denom = (df['High'] - df['Low']) / sum_close5_5
-    delay_hl_denom2 = df.groupby('Ticker')[hl_denom].shift(2)
+    # Create a temporary DataFrame with the series and ticker for proper groupby shift
+    temp_df = df[['Ticker']].copy()
+    temp_df['hl_denom'] = hl_denom
+    delay_hl_denom2 = temp_df.groupby('Ticker')['hl_denom'].shift(2)
     rank_delay = cs_rank(df, delay_hl_denom2)
     rank_vol = cs_rank(df, 'Volume')
     num = rank_delay * rank_vol
@@ -1068,30 +1072,30 @@ def alpha83(df):
     return num / denom
 
 def alpha84(df):
-    ts_max_vwap = ts_max(df, 'vwap', 15.3217)
+    ts_max_vwap = ts_max(df, 'vwap', int(15.3217))
     vwap_ts_max = df['vwap'] - ts_max_vwap
-    ts_rank_vwap = ts_rank(df, vwap_ts_max, 20.7127)
-    delta_close = ts_delta(df, 'Close', 4.96796)
+    ts_rank_vwap = ts_rank(df, vwap_ts_max, int(20.7127))
+    delta_close = ts_delta(df, 'Close', int(4.96796))
     return signed_power(df, ts_rank_vwap, delta_close)
 
 def alpha85(df):
     high_weight = df['High'] * (1 - 0.876703)
     close_weight = df['Close'] * 0.876703
     weighted = close_weight + high_weight
-    corr_weighted_adv = ts_correlation(df, weighted, 'adv30', 9.61331)
+    corr_weighted_adv = ts_correlation(df, weighted, 'adv30', int(9.61331))
     rank_corr = cs_rank(df, corr_weighted_adv)
     hl2 = (df['High'] + df['Low']) / 2
-    ts_rank_hl2 = ts_rank(df, hl2, 3.70596)
-    ts_rank_vol = ts_rank(df, 'Volume', 10.1595)
-    corr_ts = ts_correlation(df, ts_rank_hl2, ts_rank_vol, 7.11408)
+    ts_rank_hl2 = ts_rank(df, hl2, int(3.70596))
+    ts_rank_vol = ts_rank(df, 'Volume', int(10.1595))
+    corr_ts = ts_correlation(df, ts_rank_hl2, ts_rank_vol, int(7.11408))
     rank_corr2 = cs_rank(df, corr_ts)
     power = signed_power(df, rank_corr, rank_corr2)
     return power
 
 def alpha86(df):
-    sum_adv20 = ts_sum(df, 'adv20', 14.7444)
-    corr_close_sum = ts_correlation(df, 'Close', sum_adv20, 6.00049)
-    ts_rank_corr = ts_rank(df, corr_close_sum, 20.4195)
+    sum_adv20 = ts_sum(df, 'adv20', int(14.7444))
+    corr_close_sum = ts_correlation(df, 'Close', sum_adv20, int(6.00049))
+    ts_rank_corr = ts_rank(df, corr_close_sum, int(20.4195))
     open_close = df['Open'] + df['Close']
     vwap_open = df['vwap'] + df['Open']
     diff = open_close - vwap_open
@@ -1103,14 +1107,14 @@ def alpha87(df):
     close_weight = df['Close'] * (1 - 0.369701)
     vwap_weight = df['vwap'] * 0.369701
     weighted = vwap_weight + close_weight
-    delta_weighted = ts_delta(df, weighted, 1.91233)
-    decay_delta = decay_linear(df, delta_weighted, 2.65461)
+    delta_weighted = ts_delta(df, weighted, int(1.91233))
+    decay_delta = decay_linear(df, delta_weighted, int(2.65461))
     rank_decay = cs_rank(df, decay_delta)
     neutralized_adv81 = indneutralize(df, 'adv81')
-    corr_adv_close = ts_correlation(df, neutralized_adv81, 'Close', 13.4132)
+    corr_adv_close = ts_correlation(df, neutralized_adv81, 'Close', int(13.4132))
     abs_corr = np.abs(corr_adv_close)
-    decay_abs = decay_linear(df, abs_corr, 4.89768)
-    ts_rank_decay = ts_rank(df, decay_abs, 14.4535)
+    decay_abs = decay_linear(df, abs_corr, int(4.89768))
+    ts_rank_decay = ts_rank(df, decay_abs, int(14.4535))
     inner = np.maximum(rank_decay, ts_rank_decay)
     return inner * -1
 
@@ -1122,46 +1126,46 @@ def alpha88(df):
     rank_close = cs_rank(df, 'Close')
     sum_right = rank_high + rank_close
     diff = sum_left - sum_right
-    decay_diff = decay_linear(df, diff, 8.06882)
+    decay_diff = decay_linear(df, diff, int(8.06882))
     rank_decay = cs_rank(df, decay_diff)
-    ts_rank_close = ts_rank(df, 'Close', 8.44728)
-    ts_rank_adv60 = ts_rank(df, 'adv60', 20.6966)
-    corr_ts = ts_correlation(df, ts_rank_close, ts_rank_adv60, 8.01266)
-    decay_corr = decay_linear(df, corr_ts, 6.65053)
-    ts_rank_decay2 = ts_rank(df, decay_corr, 2.61957)
+    ts_rank_close = ts_rank(df, 'Close', int(8.44728))
+    ts_rank_adv60 = ts_rank(df, 'adv60', int(20.6966))
+    corr_ts = ts_correlation(df, ts_rank_close, ts_rank_adv60, int(8.01266))
+    decay_corr = decay_linear(df, corr_ts, int(6.65053))
+    ts_rank_decay2 = ts_rank(df, decay_corr, int(2.61957))
     return np.minimum(rank_decay, ts_rank_decay2)
 
 def alpha89(df):
     low_weight = df['Low'] * (1 - 0.967285)
     low_weight2 = df['Low'] * 0.967285
     weighted = low_weight + low_weight2
-    corr_weighted_adv = ts_correlation(df, weighted, 'adv10', 6.94279)
-    decay_corr = decay_linear(df, corr_weighted_adv, 5.51607)
-    ts_rank_decay = ts_rank(df, decay_corr, 3.79744)
+    corr_weighted_adv = ts_correlation(df, weighted, 'adv10', int(6.94279))
+    decay_corr = decay_linear(df, corr_weighted_adv, int(5.51607))
+    ts_rank_decay = ts_rank(df, decay_corr, int(3.79744))
     neutralized_vwap = indneutralize(df, 'vwap')
-    delta_neut = ts_delta(df, neutralized_vwap, 3.48158)
-    decay_delta = decay_linear(df, delta_neut, 10.1466)
-    ts_rank_decay2 = ts_rank(df, decay_delta, 15.3012)
+    delta_neut = ts_delta(df, neutralized_vwap, int(3.48158))
+    decay_delta = decay_linear(df, delta_neut, int(10.1466))
+    ts_rank_decay2 = ts_rank(df, decay_delta, int(15.3012))
     return ts_rank_decay - ts_rank_decay2
 
 def alpha90(df):
-    ts_max_close = ts_max(df, 'Close', 4.66719)
+    ts_max_close = ts_max(df, 'Close', int(4.66719))
     close_ts_max = df['Close'] - ts_max_close
     rank_close_ts = cs_rank(df, close_ts_max)
     neutralized_adv40 = indneutralize(df, 'adv40')
-    corr_adv_low = ts_correlation(df, neutralized_adv40, 'Low', 5.38375)
-    ts_rank_corr = ts_rank(df, corr_adv_low, 3.21856)
+    corr_adv_low = ts_correlation(df, neutralized_adv40, 'Low', int(5.38375))
+    ts_rank_corr = ts_rank(df, corr_adv_low, int(3.21856))
     power = signed_power(df, rank_close_ts, ts_rank_corr)
     return power * -1
 
 def alpha91(df):
     neutralized_close = indneutralize(df, 'Close')
-    corr_neut_vol = ts_correlation(df, neutralized_close, 'Volume', 9.74928)
-    decay_corr = decay_linear(df, corr_neut_vol, 16.398)
-    decay_decay = decay_linear(df, decay_corr, 3.83219)
-    ts_rank_decay = ts_rank(df, decay_decay, 4.8667)
-    corr_vwap_adv = ts_correlation(df, 'vwap', 'adv30', 4.01303)
-    decay_corr2 = decay_linear(df, corr_vwap_adv, 2.6809)
+    corr_neut_vol = ts_correlation(df, neutralized_close, 'Volume', int(9.74928))
+    decay_corr = decay_linear(df, corr_neut_vol, int(16.398))
+    decay_decay = decay_linear(df, decay_corr, int(3.83219))
+    ts_rank_decay = ts_rank(df, decay_decay, int(4.8667))
+    corr_vwap_adv = ts_correlation(df, 'vwap', 'adv30', int(4.01303))
+    decay_corr2 = decay_linear(df, corr_vwap_adv, int(2.6809))
     rank_decay2 = cs_rank(df, decay_corr2)
     inner = ts_rank_decay - rank_decay2
     return inner * -1
@@ -1171,67 +1175,67 @@ def alpha92(df):
     hl2_close = hl2 + df['Close']
     low_open = df['Low'] + df['Open']
     condition = hl2_close < low_open
-    decay_hl = decay_linear(df, condition, 14.7221)
-    ts_rank_decay = ts_rank(df, decay_hl, 18.8683)
+    decay_hl = decay_linear(df, condition, int(14.7221))
+    ts_rank_decay = ts_rank(df, decay_hl, int(18.8683))
     neutralized_vol = indneutralize(df, 'Volume')
     open_weight = df['Open'] * (1 - 0.634196)
     open_weight2 = df['Open'] * 0.634196
     weighted = open_weight + open_weight2
-    corr_weighted = ts_correlation(df, neutralized_vol, weighted, 17.4842)
-    decay_corr = decay_linear(df, corr_weighted, 6.92131)
-    ts_rank_decay2 = ts_rank(df, decay_corr, 13.4283)
+    corr_weighted = ts_correlation(df, neutralized_vol, weighted, int(17.4842))
+    decay_corr = decay_linear(df, corr_weighted, int(6.92131))
+    ts_rank_decay2 = ts_rank(df, decay_corr, int(13.4283))
     inner = np.minimum(ts_rank_decay, ts_rank_decay2)
     return inner * -1
 
 def alpha93(df):
     neutralized_vwap = indneutralize(df, 'vwap')
-    corr_neut_adv = ts_correlation(df, neutralized_vwap, 'adv81', 17.4193)
-    decay_corr = decay_linear(df, corr_neut_adv, 19.848)
-    ts_rank_decay = ts_rank(df, decay_corr, 7.54455)
+    corr_neut_adv = ts_correlation(df, neutralized_vwap, 'adv81', int(17.4193))
+    decay_corr = decay_linear(df, corr_neut_adv, int(19.848))
+    ts_rank_decay = ts_rank(df, decay_corr, int(7.54455))
     close_weight = df['Close'] * (1 - 0.524434)
     vwap_weight = df['vwap'] * 0.524434
     weighted = vwap_weight + close_weight
-    delta_weighted = ts_delta(df, weighted, 2.77377)
-    decay_delta = decay_linear(df, delta_weighted, 16.2664)
+    delta_weighted = ts_delta(df, weighted, int(2.77377))
+    decay_delta = decay_linear(df, delta_weighted, int(16.2664))
     rank_decay = cs_rank(df, decay_delta)
     inner = ts_rank_decay / rank_decay
     return inner
 
 def alpha94(df):
-    ts_min_vwap = ts_min(df, 'vwap', 11.5783)
+    ts_min_vwap = ts_min(df, 'vwap', int(11.5783))
     vwap_ts_min = df['vwap'] - ts_min_vwap
     rank_vwap_ts = cs_rank(df, vwap_ts_min)
-    ts_rank_vwap = ts_rank(df, 'vwap', 19.6462)
-    ts_rank_adv60 = ts_rank(df, 'adv60', 4.02992)
-    corr_ts = ts_correlation(df, ts_rank_vwap, ts_rank_adv60, 18.0926)
-    ts_rank_corr = ts_rank(df, corr_ts, 2.70756)
+    ts_rank_vwap = ts_rank(df, 'vwap', int(19.6462))
+    ts_rank_adv60 = ts_rank(df, 'adv60', int(4.02992))
+    corr_ts = ts_correlation(df, ts_rank_vwap, ts_rank_adv60, int(18.0926))
+    ts_rank_corr = ts_rank(df, corr_ts, int(2.70756))
     power = signed_power(df, rank_vwap_ts, ts_rank_corr)
     return power * -1
 
 def alpha95(df):
-    ts_min_open = ts_min(df, 'Open', 12.4105)
+    ts_min_open = ts_min(df, 'Open', int(12.4105))
     open_ts_min = df['Open'] - ts_min_open
     rank_open_ts = cs_rank(df, open_ts_min)
     hl2 = (df['High'] + df['Low']) / 2
-    sum_hl2 = ts_sum(df, hl2, 19.1351)
-    sum_adv40 = ts_sum(df, 'adv40', 19.1351)
-    corr_sum = ts_correlation(df, sum_hl2, sum_adv40, 12.8742)
+    sum_hl2 = ts_sum(df, hl2, int(19.1351))
+    sum_adv40 = ts_sum(df, 'adv40', int(19.1351))
+    corr_sum = ts_correlation(df, sum_hl2, sum_adv40, int(12.8742))
     power5 = signed_power(df, corr_sum, 5)
     rank_power = cs_rank(df, power5)
-    ts_rank_rank = ts_rank(df, rank_power, 11.7584)
+    ts_rank_rank = ts_rank(df, rank_power, int(11.7584))
     inner = rank_open_ts < ts_rank_rank
     return inner
 
 def alpha96(df):
-    corr_vwap_vol = ts_correlation(df, 'vwap', 'Volume', 3.83878)
-    decay_corr = decay_linear(df, corr_vwap_vol, 4.16783)
-    ts_rank_decay1 = ts_rank(df, decay_corr, 8.38151)
-    ts_rank_close = ts_rank(df, 'Close', 7.45404)
-    ts_rank_adv60 = ts_rank(df, 'adv60', 4.13242)
-    corr_ts = ts_correlation(df, ts_rank_close, ts_rank_adv60, 3.65459)
-    ts_argmax_corr = ts_argmax(df, corr_ts, 12.6556)
-    decay_argmax = decay_linear(df, ts_argmax_corr, 14.0365)
-    ts_rank_decay2 = ts_rank(df, decay_argmax, 13.4143)
+    corr_vwap_vol = ts_correlation(df, 'vwap', 'Volume', int(3.83878))
+    decay_corr = decay_linear(df, corr_vwap_vol, int(4.16783))
+    ts_rank_decay1 = ts_rank(df, decay_corr, int(8.38151))
+    ts_rank_close = ts_rank(df, 'Close', int(7.45404))
+    ts_rank_adv60 = ts_rank(df, 'adv60', int(4.13242))
+    corr_ts = ts_correlation(df, ts_rank_close, ts_rank_adv60, int(3.65459))
+    ts_argmax_corr = ts_argmax(df, corr_ts, int(12.6556))
+    decay_argmax = decay_linear(df, ts_argmax_corr, int(14.0365))
+    ts_rank_decay2 = ts_rank(df, decay_argmax, int(13.4143))
     inner = np.maximum(ts_rank_decay1, ts_rank_decay2)
     return inner * -1
 
@@ -1240,40 +1244,40 @@ def alpha97(df):
     vwap_weight = df['vwap'] * 0.721001
     weighted = vwap_weight + low_weight
     neutralized_weighted = indneutralize(df, weighted)
-    delta_neut = ts_delta(df, neutralized_weighted, 3.3705)
-    decay_delta = decay_linear(df, delta_neut, 20.4523)
+    delta_neut = ts_delta(df, neutralized_weighted, int(3.3705))
+    decay_delta = decay_linear(df, delta_neut, int(20.4523))
     rank_decay = cs_rank(df, decay_delta)
-    ts_rank_low = ts_rank(df, 'Low', 7.87871)
-    ts_rank_adv60 = ts_rank(df, 'adv60', 17.255)
-    corr_ts = ts_correlation(df, ts_rank_low, ts_rank_adv60, 4.97547)
-    ts_rank_corr = ts_rank(df, corr_ts, 18.5925)
-    decay_ts_rank = decay_linear(df, ts_rank_corr, 15.7152)
-    ts_rank_decay2 = ts_rank(df, decay_ts_rank, 6.71659)
+    ts_rank_low = ts_rank(df, 'Low', int(7.87871))
+    ts_rank_adv60 = ts_rank(df, 'adv60', int(17.255))
+    corr_ts = ts_correlation(df, ts_rank_low, ts_rank_adv60, int(4.97547))
+    ts_rank_corr = ts_rank(df, corr_ts, int(18.5925))
+    decay_ts_rank = decay_linear(df, ts_rank_corr, int(15.7152))
+    ts_rank_decay2 = ts_rank(df, decay_ts_rank, int(6.71659))
     inner = rank_decay - ts_rank_decay2
     return inner * -1
 
 def alpha98(df):
-    sum_adv5 = ts_sum(df, 'adv5', 26.4719)
-    corr_vwap_sum = ts_correlation(df, 'vwap', sum_adv5, 4.58418)
-    decay_corr = decay_linear(df, corr_vwap_sum, 7.18088)
+    sum_adv5 = ts_sum(df, 'adv5', int(26.4719))
+    corr_vwap_sum = ts_correlation(df, 'vwap', sum_adv5, int(4.58418))
+    decay_corr = decay_linear(df, corr_vwap_sum, int(7.18088))
     rank_decay = cs_rank(df, decay_corr)
     rank_open = cs_rank(df, 'Open')
     rank_adv15 = cs_rank(df, 'adv15')
-    corr_rank = ts_correlation(df, rank_open, rank_adv15, 20.8187)
-    ts_argmin_corr = ts_argmin(df, corr_rank, 8.62571)
-    ts_rank_argmin = ts_rank(df, ts_argmin_corr, 6.95668)
-    decay_ts_rank = decay_linear(df, ts_rank_argmin, 8.07206)
+    corr_rank = ts_correlation(df, rank_open, rank_adv15, int(20.8187))
+    ts_argmin_corr = ts_argmin(df, corr_rank, int(8.62571))
+    ts_rank_argmin = ts_rank(df, ts_argmin_corr, int(6.95668))
+    decay_ts_rank = decay_linear(df, ts_rank_argmin, int(8.07206))
     rank_decay2 = cs_rank(df, decay_ts_rank)
     inner = rank_decay - rank_decay2
     return inner
 
 def alpha99(df):
     hl2 = (df['High'] + df['Low']) / 2
-    sum_hl2 = ts_sum(df, hl2, 19.8975)
-    sum_adv60 = ts_sum(df, 'adv60', 19.8975)
-    corr_sum = ts_correlation(df, sum_hl2, sum_adv60, 8.8136)
+    sum_hl2 = ts_sum(df, hl2, int(19.8975))
+    sum_adv60 = ts_sum(df, 'adv60', int(19.8975))
+    corr_sum = ts_correlation(df, sum_hl2, sum_adv60, int(8.8136))
     rank_corr = cs_rank(df, corr_sum)
-    corr_low_vol = ts_correlation(df, 'Low', 'Volume', 6.28259)
+    corr_low_vol = ts_correlation(df, 'Low', 'Volume', int(6.28259))
     rank_corr2 = cs_rank(df, corr_low_vol)
     inner = rank_corr < rank_corr2
     return inner * -1
@@ -1300,14 +1304,322 @@ def alpha101(df):
     close_open = df['Close'] - df['Open']
     return close_open / hl
 
-# Main script
+def backtest_alphas(df):
+    """
+    Backtest alpha factors by converting them to trading signals and calculating PnL
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+    # Get alpha columns
+    alpha_cols = [col for col in df.columns if col.startswith('alpha_')]
+    
+    # Calculate daily returns for each crypto
+    df_sorted = df.sort_values(['Ticker', 'Date']).copy()
+    
+    # Ensure Date is properly formatted as datetime
+    df_sorted['Date'] = pd.to_datetime(df_sorted['Date'])
+    
+    # Calculate next day returns (forward-looking returns for backtesting)
+    df_sorted['next_close'] = df_sorted.groupby('Ticker')['Close'].shift(-1)
+    df_sorted['daily_return'] = (df_sorted['next_close'] - df_sorted['Close']) / df_sorted['Close']
+    
+    # Remove last day for each ticker (no forward return available)
+    df_sorted = df_sorted.dropna(subset=['daily_return'])
+    
+    backtest_results = {}
+    
+    for alpha_col in alpha_cols:
+        print(f"Backtesting {alpha_col}...")
+        
+        # Create trading signals from alpha values
+        # Rank-based long/short strategy: top 20% long, bottom 20% short
+        df_sorted[f'{alpha_col}_rank'] = df_sorted.groupby('Date')[alpha_col].rank(pct=True)
+        
+        # Create positions: 1 for long (top 20%), -1 for short (bottom 20%), 0 for neutral
+        df_sorted[f'{alpha_col}_position'] = 0
+        df_sorted.loc[df_sorted[f'{alpha_col}_rank'] >= 0.8, f'{alpha_col}_position'] = 1
+        df_sorted.loc[df_sorted[f'{alpha_col}_rank'] <= 0.2, f'{alpha_col}_position'] = -1
+        
+        # Calculate strategy returns
+        df_sorted[f'{alpha_col}_strategy_return'] = df_sorted[f'{alpha_col}_position'] * df_sorted['daily_return']
+        
+        # Calculate daily portfolio returns (average across all positions)
+        daily_returns = df_sorted.groupby('Date')[f'{alpha_col}_strategy_return'].mean()
+        
+        # Ensure the index is datetime
+        daily_returns.index = pd.to_datetime(daily_returns.index)
+        
+        # Calculate cumulative returns
+        cumulative_returns = (1 + daily_returns).cumprod()
+        
+        # Calculate performance metrics
+        total_return = cumulative_returns.iloc[-1] - 1
+        volatility = daily_returns.std() * np.sqrt(252)  # Annualized volatility
+        sharpe_ratio = (daily_returns.mean() * 252) / volatility if volatility > 0 else 0
+        max_drawdown = (cumulative_returns / cumulative_returns.expanding().max() - 1).min()
+        
+        backtest_results[alpha_col] = {
+            'daily_returns': daily_returns,
+            'cumulative_returns': cumulative_returns,
+            'total_return': total_return,
+            'volatility': volatility,
+            'sharpe_ratio': sharpe_ratio,
+            'max_drawdown': max_drawdown
+        }
+        
+        print(f"{alpha_col} - Total Return: {total_return:.2%}, Sharpe: {sharpe_ratio:.2f}, Max DD: {max_drawdown:.2%}")
+    
+    return backtest_results
 
-if __name__ == "__main__":
+def plot_cumulative_pnl(backtest_results):
+    """
+    Plot cumulative PnL for all alpha strategies with quarterly x-axis labels
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import matplotlib.dates as mdates
+    from datetime import datetime
+    
+    plt.figure(figsize=(20, 12))
+    
+    # Plot top 10 performing alphas
+    performance_summary = {}
+    for alpha, results in backtest_results.items():
+        performance_summary[alpha] = results['sharpe_ratio']
+    
+    # Sort by Sharpe ratio
+    top_alphas = sorted(performance_summary.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    plt.subplot(2, 2, 1)
+    for alpha, _ in top_alphas:
+        cumulative_returns = backtest_results[alpha]['cumulative_returns']
+        
+        # Ensure dates are properly formatted
+        dates = pd.to_datetime(cumulative_returns.index)
+        
+        plt.plot(dates, cumulative_returns.values, label=alpha, linewidth=1.5)
+    
+    plt.title('Top 10 Alpha Strategies - Cumulative Returns')
+    plt.xlabel('Date')
+    plt.ylabel('Cumulative Return')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True, alpha=0.3)
+    
+    # Format x-axis to show quarters
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))  # Every 3 months (quarterly)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+    
+    # Plot all alphas (lighter lines)
+    plt.subplot(2, 2, 2)
+    for alpha, results in backtest_results.items():
+        cumulative_returns = results['cumulative_returns']
+        dates = pd.to_datetime(cumulative_returns.index)
+        plt.plot(dates, cumulative_returns.values, alpha=0.3, linewidth=0.5)
+    
+    plt.title('All 101 Alpha Strategies - Cumulative Returns')
+    plt.xlabel('Date')
+    plt.ylabel('Cumulative Return')
+    plt.grid(True, alpha=0.3)
+    
+    # Format x-axis to show quarters
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+    
+    # Performance distribution
+    plt.subplot(2, 2, 3)
+    sharpe_ratios = [results['sharpe_ratio'] for results in backtest_results.values()]
+    plt.hist(sharpe_ratios, bins=30, alpha=0.7, edgecolor='black')
+    plt.title('Distribution of Sharpe Ratios')
+    plt.xlabel('Sharpe Ratio')
+    plt.ylabel('Number of Strategies')
+    plt.grid(True, alpha=0.3)
+    
+    # Return vs Risk scatter
+    plt.subplot(2, 2, 4)
+    returns = [results['total_return'] for results in backtest_results.values()]
+    volatilities = [results['volatility'] for results in backtest_results.values()]
+    colors = [results['sharpe_ratio'] for results in backtest_results.values()]
+    
+    scatter = plt.scatter(volatilities, returns, c=colors, cmap='RdYlGn', alpha=0.7)
+    plt.colorbar(scatter, label='Sharpe Ratio')
+    plt.title('Risk-Return Profile of Alpha Strategies')
+    plt.xlabel('Annualized Volatility')
+    plt.ylabel('Total Return')
+    plt.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig('data/alpha_backtest_results.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Print summary statistics
+    print("\n" + "="*80)
+    print("BACKTESTING SUMMARY")
+    print("="*80)
+    print(f"Number of strategies: {len(backtest_results)}")
+    print(f"Average Sharpe Ratio: {np.mean(sharpe_ratios):.3f}")
+    print(f"Best Sharpe Ratio: {max(sharpe_ratios):.3f}")
+    print(f"Worst Sharpe Ratio: {min(sharpe_ratios):.3f}")
+    print(f"Average Total Return: {np.mean(returns):.2%}")
+    print(f"Best Total Return: {max(returns):.2%}")
+    print(f"Worst Total Return: {min(returns):.2%}")
+    
+    print(f"\nTop 10 Alpha Strategies by Sharpe Ratio:")
+    for i, (alpha, sharpe) in enumerate(top_alphas, 1):
+        results = backtest_results[alpha]
+        print(f"{i:2d}. {alpha:8s} - Sharpe: {sharpe:6.3f}, Return: {results['total_return']:7.2%}, Vol: {results['volatility']:6.2%}, MaxDD: {results['max_drawdown']:7.2%}")
+    
+    return backtest_results
+
+
+def alphalens_analysis(df, backtest_results=None):
+    """
+    Simplified alpha factor analysis without Alphalens for now
+    """
+    import matplotlib.pyplot as plt
+    print("Performing simplified alpha factor analysis...")
+    
+    # Get alpha columns
+    alpha_cols = [col for col in df.columns if col.startswith('alpha_')]
+    
+    # Basic correlation analysis between alpha factors and forward returns
+    df_analysis = df.copy()
+    df_analysis['Date'] = pd.to_datetime(df_analysis['Date'])
+    df_analysis = df_analysis.sort_values(['Ticker', 'Date'])
+    
+    # Calculate 1-day forward returns
+    df_analysis['forward_return_1d'] = df_analysis.groupby('Ticker')['Close'].pct_change().shift(-1)
+    
+    # Calculate Information Coefficient (IC) for each alpha
+    ic_results = {}
+    
+    print("Calculating Information Coefficients...")
+    for alpha_col in alpha_cols:
+        # Calculate correlation between alpha and forward returns
+        valid_data = df_analysis[[alpha_col, 'forward_return_1d', 'Date']].dropna()
+        
+        if len(valid_data) > 10:  # Need sufficient data
+            # Calculate daily IC (correlation by date)
+            daily_ic = valid_data.groupby('Date').apply(
+                lambda x: x[alpha_col].corr(x['forward_return_1d']) if len(x) > 1 else np.nan
+            ).dropna()
+            
+            if len(daily_ic) > 0:
+                mean_ic = daily_ic.mean()
+                ic_std = daily_ic.std()
+                ic_ir = mean_ic / ic_std if ic_std > 0 else 0
+                
+                ic_results[alpha_col] = {
+                    'mean_ic': mean_ic,
+                    'ic_std': ic_std, 
+                    'ic_ir': ic_ir,
+                    'daily_ic': daily_ic
+                }
+    
+    # Sort by Information Ratio
+    sorted_alphas = sorted(ic_results.items(), key=lambda x: abs(x[1]['ic_ir']), reverse=True)
+    
+    # Plot IC analysis
+    if ic_results:
+        fig, axes = plt.subplots(2, 2, figsize=(20, 12))
+        
+        # Plot 1: IC time series for top 5 alphas
+        top_5_alphas = sorted_alphas[:5]
+        for alpha_name, results in top_5_alphas:
+            daily_ic = results['daily_ic']
+            dates = pd.to_datetime(daily_ic.index)
+            axes[0,0].plot(dates, daily_ic.values, label=alpha_name, alpha=0.7)
+        
+        axes[0,0].set_title('Information Coefficient Time Series (Top 5 Alphas)')
+        axes[0,0].set_xlabel('Date')
+        axes[0,0].set_ylabel('IC')
+        axes[0,0].legend()
+        axes[0,0].grid(True, alpha=0.3)
+        axes[0,0].axhline(y=0, color='black', linestyle='--', alpha=0.5)
+        
+        # Plot 2: Mean IC distribution
+        mean_ics = [results['mean_ic'] for results in ic_results.values()]
+        axes[0,1].hist(mean_ics, bins=20, alpha=0.7, edgecolor='black')
+        axes[0,1].set_title('Distribution of Mean IC')
+        axes[0,1].set_xlabel('Mean IC')
+        axes[0,1].set_ylabel('Number of Alphas')
+        axes[0,1].grid(True, alpha=0.3)
+        axes[0,1].axvline(x=0, color='red', linestyle='--', alpha=0.5)
+        
+        # Plot 3: IC vs IR scatter
+        irs = [results['ic_ir'] for results in ic_results.values()]
+        axes[1,0].scatter(mean_ics, irs, alpha=0.6)
+        axes[1,0].set_title('Mean IC vs Information Ratio')
+        axes[1,0].set_xlabel('Mean IC')
+        axes[1,0].set_ylabel('Information Ratio')
+        axes[1,0].grid(True, alpha=0.3)
+        axes[1,0].axhline(y=0, color='black', linestyle='--', alpha=0.5)
+        axes[1,0].axvline(x=0, color='black', linestyle='--', alpha=0.5)
+        
+        # Plot 4: Top alphas bar chart
+        top_10_names = [name for name, _ in sorted_alphas[:10]]
+        top_10_irs = [results['ic_ir'] for _, results in sorted_alphas[:10]]
+        
+        bars = axes[1,1].bar(range(len(top_10_names)), top_10_irs)
+        axes[1,1].set_title('Top 10 Alphas by Information Ratio')
+        axes[1,1].set_xlabel('Alpha Factor')
+        axes[1,1].set_ylabel('Information Ratio')
+        axes[1,1].set_xticks(range(len(top_10_names)))
+        axes[1,1].set_xticklabels(top_10_names, rotation=45)
+        axes[1,1].grid(True, alpha=0.3)
+        axes[1,1].axhline(y=0, color='red', linestyle='--', alpha=0.5)
+        
+        # Color bars based on value
+        for i, bar in enumerate(bars):
+            if top_10_irs[i] > 0:
+                bar.set_color('green')
+            else:
+                bar.set_color('red')
+        
+        plt.tight_layout()
+        plt.savefig('data/alpha_ic_analysis.png', dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        # Print summary
+        print("\n" + "="*80)
+        print("ALPHA FACTOR ANALYSIS SUMMARY")
+        print("="*80)
+        print(f"Total alpha factors analyzed: {len(ic_results)}")
+        print(f"Average IC: {np.mean(mean_ics):.4f}")
+        print(f"Average IR: {np.mean(irs):.4f}")
+        print(f"Positive IC alphas: {sum(1 for ic in mean_ics if ic > 0)}")
+        print(f"Negative IC alphas: {sum(1 for ic in mean_ics if ic < 0)}")
+        
+        print(f"\nTop 10 Alpha Factors by Information Ratio:")
+        for i, (alpha_name, results) in enumerate(sorted_alphas[:10], 1):
+            print(f"{i:2d}. {alpha_name:10s} - IC: {results['mean_ic']:7.4f}, IR: {results['ic_ir']:7.3f}, IC_Std: {results['ic_std']:6.4f}")
+        
+        # Save detailed results
+        ic_summary = pd.DataFrame({
+            'alpha': list(ic_results.keys()),
+            'mean_ic': [r['mean_ic'] for r in ic_results.values()],
+            'ic_std': [r['ic_std'] for r in ic_results.values()],
+            'ic_ir': [r['ic_ir'] for r in ic_results.values()]
+        }).sort_values('ic_ir', key=abs, ascending=False)
+        
+        ic_summary.to_csv('data/alpha_ic_analysis.csv', index=False)
+        print(f"\nDetailed IC analysis saved to 'data/alpha_ic_analysis.csv'")
+        
+    else:
+        print("No valid alpha factors found for analysis.")
+def main():
     # Load the combined dataframe
     all_df = pd.read_csv("data/Binance_AllCrypto_d.csv")
     all_df.index = range(all_df.shape[0])
     # all_df = pd.read_csv("data/ccxt_Binance_AllCrypto_d.csv")
 
+    # Convert Date column to proper datetime format
+    all_df['Date'] = pd.to_datetime(all_df['Date'])
+    
     all_df = all_df.sort_values(['Ticker', 'Date'])
 
     # Loop through each ticker for TA-Lib indicators (time-series per ticker)
@@ -1326,10 +1638,40 @@ if __name__ == "__main__":
     alpha_functions = [globals()[f'alpha{i}'] for i in range(1, 102)]
 
     for i, alpha_func in enumerate(alpha_functions, 1):
-        if(i<56):
-            continue
+        # if(i<82):
+        #     continue
         print(f"about to process alpha_{i}")
         all_df[f"alpha_{i}"] = alpha_func(all_df)
         print(f"processed alpha_{i}")
-        
-    print(all_df.shape)
+    
+    print(f"Successfully calculated all 101 alpha factors!")
+    print(f"DataFrame shape: {all_df.shape}")
+    
+    # Save the results
+    all_df.to_csv('data/alpha_factors_results.csv', index=False)
+    print("Alpha factors saved to 'data/alpha_factors_results.csv'")
+    
+    # Backtesting
+    print("\nStarting backtesting...")
+    backtest_results = backtest_alphas(all_df)
+    
+    # Plot results
+    print("Plotting cumulative PnL...")
+    plot_cumulative_pnl(backtest_results)
+    
+    # Alphalens analysis
+    print("\nStarting Alphalens analysis...")
+    try:
+        alphalens_analysis(all_df, backtest_results)
+    except ImportError:
+        print("Alphalens not installed. Installing now...")
+        import subprocess
+        subprocess.run(["pip", "install", "alphalens-reloaded"], check=True)
+        alphalens_analysis(all_df, backtest_results)
+    except Exception as e:
+        print(f"Alphalens analysis failed: {e}")
+        print("Continuing without Alphalens analysis...")
+
+
+if __name__ == "__main__":
+    main()

@@ -3,6 +3,22 @@ import numpy as np
 from scipy.stats import rankdata
 import talib
 
+# Import additional alpha factors
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+try:
+    # Import enhanced alpha functions
+    from additional_alpha_factors import add_additional_alphas, add_enhanced_alphas
+    additional_alphas_available = True
+    print("Successfully imported additional alpha factors")
+except ImportError:
+    print("Could not import additional alpha factors. Continuing with original 101 alphas.")
+    additional_alphas_available = False
+    # Import enhanced alpha functions  
+    add_additional_alphas = None
+    add_enhanced_alphas = None
+
 # Helper functions updated to handle both string column names and series
 
 def ts_min(df, s, d):
@@ -1327,7 +1343,42 @@ def backtest_alphas(df):
     # Remove last day for each ticker (no forward return available)
     df_sorted = df_sorted.dropna(subset=['daily_return'])
     
+    # Calculate BTC buy-and-hold benchmark
+    btc_data = df_sorted[df_sorted['Ticker'].str.contains('BTC', case=False, na=False)].copy()
+    btc_benchmark = None
+    
+    if len(btc_data) > 0:
+        # Use the first BTC-like ticker found
+        btc_ticker = btc_data['Ticker'].iloc[0]
+        btc_subset = btc_data[btc_data['Ticker'] == btc_ticker].sort_values('Date')
+        
+        if len(btc_subset) > 0:
+            btc_returns = btc_subset['daily_return']
+            # Align BTC returns with the main date index used by alpha strategies
+            btc_returns.index = pd.to_datetime(btc_subset['Date'])
+            btc_cumulative = (1 + btc_returns).cumprod()
+            
+            btc_benchmark = {
+                'daily_returns': btc_returns,
+                'cumulative_returns': btc_cumulative,
+                'total_return': btc_cumulative.iloc[-1] - 1,
+                'volatility': btc_returns.std() * np.sqrt(252),
+                'sharpe_ratio': (btc_returns.mean() * 252) / (btc_returns.std() * np.sqrt(252)) if btc_returns.std() > 0 else 0,
+                'max_drawdown': (btc_cumulative / btc_cumulative.expanding().max() - 1).min(),
+                'ticker': btc_ticker
+            }
+            print(f"\nBTC Buy-and-Hold Benchmark ({btc_ticker}):")
+            print(f"  Total Return: {btc_benchmark['total_return']:.2%}")
+            print(f"  Volatility: {btc_benchmark['volatility']:.2%}")
+            print(f"  Sharpe Ratio: {btc_benchmark['sharpe_ratio']:.3f}")
+            print(f"  Max Drawdown: {btc_benchmark['max_drawdown']:.2%}")
+        else:
+            print("Warning: Could not find sufficient BTC data for benchmark")
+    else:
+        print("Warning: Could not find BTC data for benchmark")
+    
     backtest_results = {}
+    backtest_results['btc_benchmark'] = btc_benchmark
     
     for alpha_col in alpha_cols:
         print(f"Backtesting {alpha_col}...")
@@ -1370,103 +1421,211 @@ def backtest_alphas(df):
         
         print(f"{alpha_col} - Total Return: {total_return:.2%}, Sharpe: {sharpe_ratio:.2f}, Max DD: {max_drawdown:.2%}")
     
+    # Compare with BTC benchmark
+    if btc_benchmark is not None:
+        print(f"\n{'='*80}")
+        print("PERFORMANCE COMPARISON vs BTC BUY & HOLD")
+        print(f"{'='*80}")
+        print(f"BTC Buy & Hold - Total Return: {btc_benchmark['total_return']:.2%}, Sharpe: {btc_benchmark['sharpe_ratio']:.2f}, Max DD: {btc_benchmark['max_drawdown']:.2%}")
+        
+        # Find alphas that beat BTC
+        alphas_beating_btc = []
+        for alpha_col in alpha_cols:
+            if alpha_col in backtest_results:
+                alpha_return = backtest_results[alpha_col]['total_return']
+                if alpha_return > btc_benchmark['total_return']:
+                    alphas_beating_btc.append((alpha_col, alpha_return))
+        
+        if alphas_beating_btc:
+            print(f"\nAlphas beating BTC buy & hold ({len(alphas_beating_btc)} out of {len(alpha_cols)}):")
+            alphas_beating_btc.sort(key=lambda x: x[1], reverse=True)
+            for alpha, return_rate in alphas_beating_btc[:10]:  # Show top 10
+                print(f"  {alpha}: {return_rate:.2%}")
+        else:
+            print(f"\nNo alphas beat BTC buy & hold strategy!")
+            print("This is common in strong bull markets where momentum dominates.")
+    
     return backtest_results
 
 def plot_cumulative_pnl(backtest_results):
     """
-    Plot cumulative PnL for all alpha strategies with quarterly x-axis labels
+    Plot cumulative PnL for all alpha strategies with BTC benchmark and quarterly x-axis labels
     """
     import matplotlib.pyplot as plt
     import seaborn as sns
     import matplotlib.dates as mdates
     from datetime import datetime
     
-    plt.figure(figsize=(20, 12))
+    # Close any existing plots to prevent overlap
+    plt.close('all')
+    
+    fig, axes = plt.subplots(2, 2, figsize=(20, 12))
+    
+    # Plot BTC benchmark first (if available)
+    btc_benchmark = backtest_results.get('btc_benchmark')
+    if btc_benchmark is not None:
+        btc_dates = pd.to_datetime(btc_benchmark['cumulative_returns'].index)
+        # This will be plotted in each subplot as needed
+        print(f"BTC benchmark plotted: {btc_benchmark['total_return']:.2%} total return")
     
     # Plot top 10 performing alphas
     performance_summary = {}
     for alpha, results in backtest_results.items():
-        performance_summary[alpha] = results['sharpe_ratio']
+        if alpha != 'btc_benchmark':  # Exclude benchmark from alpha ranking
+            performance_summary[alpha] = results['sharpe_ratio']
     
     # Sort by Sharpe ratio
     top_alphas = sorted(performance_summary.items(), key=lambda x: x[1], reverse=True)[:10]
     
-    plt.subplot(2, 2, 1)
+    # Subplot 1: Top 10 Alpha Strategies
+    ax1 = axes[0, 0]
+    
+    # Plot BTC benchmark in subplot 1
+    if btc_benchmark is not None:
+        btc_dates = btc_benchmark['cumulative_returns'].index  # Already datetime from the fix above
+        ax1.plot(btc_dates, btc_benchmark['cumulative_returns'].values, 
+                linewidth=3, label=f"BTC Benchmark", 
+                color='orange', alpha=0.8, linestyle='-')
+    
     for alpha, _ in top_alphas:
         cumulative_returns = backtest_results[alpha]['cumulative_returns']
         
         # Ensure dates are properly formatted
         dates = pd.to_datetime(cumulative_returns.index)
         
-        plt.plot(dates, cumulative_returns.values, label=alpha, linewidth=1.5)
+        ax1.plot(dates, cumulative_returns.values, label=alpha, linewidth=1.5)
     
-    plt.title('Top 10 Alpha Strategies - Cumulative Returns')
-    plt.xlabel('Date')
-    plt.ylabel('Cumulative Return')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True, alpha=0.3)
+    ax1.set_title('Top 10 Alpha Strategies - Cumulative Returns')
+    ax1.set_xlabel('Date')
+    ax1.set_ylabel('Cumulative Return')
+    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax1.grid(True, alpha=0.3)
     
     # Format x-axis to show quarters
-    ax = plt.gca()
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))  # Every 3 months (quarterly)
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+    ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=3))  # Every 3 months (quarterly)
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
     
-    # Plot all alphas (lighter lines)
-    plt.subplot(2, 2, 2)
+    # Subplot 2: All alphas (lighter lines)
+    ax2 = axes[0, 1]
+    
+    # First plot all alpha strategies with better visibility
     for alpha, results in backtest_results.items():
+        if alpha == 'btc_benchmark':  # Skip the benchmark in the alpha loop
+            continue
         cumulative_returns = results['cumulative_returns']
         dates = pd.to_datetime(cumulative_returns.index)
-        plt.plot(dates, cumulative_returns.values, alpha=0.3, linewidth=0.5)
+        ax2.plot(dates, cumulative_returns.values, alpha=0.6, linewidth=0.8, color='lightblue')
     
-    plt.title('All 101 Alpha Strategies - Cumulative Returns')
-    plt.xlabel('Date')
-    plt.ylabel('Cumulative Return')
-    plt.grid(True, alpha=0.3)
+    # Then plot BTC benchmark on top so it's clearly visible
+    if btc_benchmark is not None:
+        btc_dates = btc_benchmark['cumulative_returns'].index
+        ax2.plot(btc_dates, btc_benchmark['cumulative_returns'].values, 
+                linewidth=3, label=f"BTC Benchmark", 
+                color='orange', alpha=0.9, linestyle='-')
+        ax2.legend()
+    
+    ax2.set_title('All Alpha Strategies + BTC Benchmark - Cumulative Returns')
+    ax2.set_xlabel('Date')
+    ax2.set_ylabel('Cumulative Return')
+    ax2.grid(True, alpha=0.3)
     
     # Format x-axis to show quarters
-    ax = plt.gca()
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+    ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
     
-    # Performance distribution
-    plt.subplot(2, 2, 3)
-    sharpe_ratios = [results['sharpe_ratio'] for results in backtest_results.values()]
-    plt.hist(sharpe_ratios, bins=30, alpha=0.7, edgecolor='black')
-    plt.title('Distribution of Sharpe Ratios')
-    plt.xlabel('Sharpe Ratio')
-    plt.ylabel('Number of Strategies')
-    plt.grid(True, alpha=0.3)
+    # Subplot 3: Performance distribution
+    ax3 = axes[1, 0]
+    alpha_sharpe_ratios = [results['sharpe_ratio'] for alpha, results in backtest_results.items() if alpha != 'btc_benchmark']
+    ax3.hist(alpha_sharpe_ratios, bins=30, alpha=0.7, edgecolor='black', color='skyblue', label='Alpha Strategies')
     
-    # Return vs Risk scatter
-    plt.subplot(2, 2, 4)
-    returns = [results['total_return'] for results in backtest_results.values()]
-    volatilities = [results['volatility'] for results in backtest_results.values()]
-    colors = [results['sharpe_ratio'] for results in backtest_results.values()]
+    # Add BTC benchmark line
+    if btc_benchmark is not None:
+        ax3.axvline(btc_benchmark['sharpe_ratio'], color='orange', linestyle='--', 
+                   linewidth=2, label=f'BTC Benchmark ({btc_benchmark["sharpe_ratio"]:.2f})')
     
-    scatter = plt.scatter(volatilities, returns, c=colors, cmap='RdYlGn', alpha=0.7)
-    plt.colorbar(scatter, label='Sharpe Ratio')
-    plt.title('Risk-Return Profile of Alpha Strategies')
-    plt.xlabel('Annualized Volatility')
-    plt.ylabel('Total Return')
-    plt.grid(True, alpha=0.3)
+    ax3.set_title('Distribution of Sharpe Ratios')
+    ax3.set_xlabel('Sharpe Ratio')
+    ax3.set_ylabel('Number of Strategies')
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+    
+    # Subplot 4: Return vs Risk scatter
+    ax4 = axes[1, 1]
+    alpha_returns = [results['total_return'] for alpha, results in backtest_results.items() if alpha != 'btc_benchmark']
+    alpha_volatilities = [results['volatility'] for alpha, results in backtest_results.items() if alpha != 'btc_benchmark']
+    alpha_sharpes = [results['sharpe_ratio'] for alpha, results in backtest_results.items() if alpha != 'btc_benchmark']
+    
+    scatter = ax4.scatter(alpha_volatilities, alpha_returns, c=alpha_sharpes, cmap='RdYlGn', alpha=0.7, label='Alpha Strategies')
+    
+    # Add BTC benchmark point
+    if btc_benchmark is not None:
+        ax4.scatter(btc_benchmark['volatility'], btc_benchmark['total_return'], 
+                   c='orange', s=200, marker='*', edgecolors='black', linewidth=2,
+                   label=f'BTC Benchmark', alpha=0.9)
+    
+    fig.colorbar(scatter, ax=ax4, label='Sharpe Ratio')
+    ax4.set_title('Risk-Return Profile: Alpha Strategies vs BTC Benchmark')
+    ax4.set_xlabel('Annualized Volatility')
+    ax4.set_ylabel('Total Return')
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
     
     plt.tight_layout()
     plt.savefig('data/alpha_backtest_results.png', dpi=300, bbox_inches='tight')
     plt.show()
     
+    # Performance summary with benchmark comparison
+    alpha_sharpe_ratios = [results['sharpe_ratio'] for alpha, results in backtest_results.items() if alpha != 'btc_benchmark']
+    alpha_returns = [results['total_return'] for alpha, results in backtest_results.items() if alpha != 'btc_benchmark']
+    
     # Print summary statistics
     print("\n" + "="*80)
-    print("BACKTESTING SUMMARY")
+    print("COMPREHENSIVE BACKTESTING SUMMARY")
     print("="*80)
-    print(f"Number of strategies: {len(backtest_results)}")
-    print(f"Average Sharpe Ratio: {np.mean(sharpe_ratios):.3f}")
-    print(f"Best Sharpe Ratio: {max(sharpe_ratios):.3f}")
-    print(f"Worst Sharpe Ratio: {min(sharpe_ratios):.3f}")
-    print(f"Average Total Return: {np.mean(returns):.2%}")
-    print(f"Best Total Return: {max(returns):.2%}")
-    print(f"Worst Total Return: {min(returns):.2%}")
+    print(f"Number of alpha strategies: {len(alpha_sharpe_ratios)}")
+    print(f"Average Sharpe Ratio: {np.mean(alpha_sharpe_ratios):.3f}")
+    print(f"Best Sharpe Ratio: {max(alpha_sharpe_ratios):.3f}")
+    print(f"Worst Sharpe Ratio: {min(alpha_sharpe_ratios):.3f}")
+    print(f"Average Total Return: {np.mean(alpha_returns):.2%}")
+    print(f"Best Total Return: {max(alpha_returns):.2%}")
+    print(f"Worst Total Return: {min(alpha_returns):.2%}")
+    
+    if btc_benchmark is not None:
+        print(f"\nBTC Buy-and-Hold Benchmark Performance:")
+        print(f"BTC Total Return: {btc_benchmark['total_return']:.2%}")
+        print(f"BTC Sharpe Ratio: {btc_benchmark['sharpe_ratio']:.3f}")
+        print(f"BTC Volatility: {btc_benchmark['volatility']:.2%}")
+        print(f"BTC Max Drawdown: {btc_benchmark['max_drawdown']:.2%}")
+        
+        # Compare strategies against BTC
+        alphas_beating_btc_return = [alpha for alpha, results in backtest_results.items() 
+                                    if alpha != 'btc_benchmark' and results['total_return'] > btc_benchmark['total_return']]
+        alphas_beating_btc_sharpe = [alpha for alpha, results in backtest_results.items() 
+                                    if alpha != 'btc_benchmark' and results['sharpe_ratio'] > btc_benchmark['sharpe_ratio']]
+        
+        print(f"\n📊 REALITY CHECK - Alpha Strategies vs BTC Buy-and-Hold:")
+        print(f"Number of alphas beating BTC total return: {len(alphas_beating_btc_return)}/{len(alpha_returns)}")
+        print(f"Number of alphas beating BTC Sharpe ratio: {len(alphas_beating_btc_sharpe)}/{len(alpha_returns)}")
+        
+        if len(alphas_beating_btc_return) > 0:
+            print(f"\n🎯 Alphas beating BTC total return:")
+            for alpha in alphas_beating_btc_return[:5]:  # Show top 5
+                alpha_return = backtest_results[alpha]['total_return']
+                print(f"  {alpha}: {alpha_return:.2%} (vs BTC: {btc_benchmark['total_return']:.2%})")
+        else:
+            print(f"\n⚠️  NO alpha strategies beat BTC buy-and-hold total return!")
+            print(f"   This highlights the challenge of beating crypto bull markets with complex strategies.")
+        
+        if len(alphas_beating_btc_sharpe) > 0:
+            print(f"\n🎯 Alphas beating BTC Sharpe ratio:")
+            for alpha in alphas_beating_btc_sharpe[:5]:  # Show top 5
+                alpha_sharpe = backtest_results[alpha]['sharpe_ratio']
+                print(f"  {alpha}: {alpha_sharpe:.3f} (vs BTC: {btc_benchmark['sharpe_ratio']:.3f})")
+        else:
+            print(f"\n⚠️  NO alpha strategies beat BTC buy-and-hold Sharpe ratio!")
+            print(f"   Even risk-adjusted returns couldn't beat simple BTC holding.")
     
     print(f"\nTop 10 Alpha Strategies by Sharpe Ratio:")
     for i, (alpha, sharpe) in enumerate(top_alphas, 1):
@@ -1525,6 +1684,9 @@ def alphalens_analysis(df, backtest_results=None):
     
     # Plot IC analysis
     if ic_results:
+        # Close any existing plots to prevent overlap
+        plt.close('all')
+        
         fig, axes = plt.subplots(2, 2, figsize=(20, 12))
         
         # Plot 1: IC time series for top 5 alphas
@@ -1611,6 +1773,7 @@ def alphalens_analysis(df, backtest_results=None):
         
     else:
         print("No valid alpha factors found for analysis.")
+        
 def main():
     # Load the combined dataframe
     all_df = pd.read_csv("data/Binance_AllCrypto_d.csv")
@@ -1646,6 +1809,60 @@ def main():
     
     print(f"Successfully calculated all 101 alpha factors!")
     print(f"DataFrame shape: {all_df.shape}")
+    
+    # Add additional alpha factors if available
+    if additional_alphas_available and add_additional_alphas is not None:
+        print("\n" + "="*60)
+        print("ADDING RESEARCH-BASED ALPHA FACTORS (102-120)")
+        print("="*60)
+        try:
+            all_df = add_additional_alphas(all_df)
+            additional_alpha_cols = [col for col in all_df.columns if col.startswith('alpha_') and 102 <= int(col.split('_')[1]) <= 120]
+            print(f"Successfully added {len(additional_alpha_cols)} research-based alpha factors!")
+        except Exception as e:
+            print(f"Error adding research-based alpha factors: {e}")
+    
+    # Add enhanced simple alpha factors inspired by alpha_101's success
+    if additional_alphas_available and add_enhanced_alphas is not None:
+        print("\n" + "="*60) 
+        print("ADDING ENHANCED SIMPLE ALPHA FACTORS (121-140)")
+        print("="*60)
+        print("Inspiration: Alpha_101's success with simple, robust formulations")
+        print("Focus: Volatility-adjusted momentum strategies for crypto")
+        try:
+            all_df = add_enhanced_alphas(all_df)
+            enhanced_alpha_cols = [col for col in all_df.columns if col.startswith('alpha_') and 121 <= int(col.split('_')[1]) <= 140]
+            print(f"Successfully added {len(enhanced_alpha_cols)} enhanced simple alpha factors!")
+        except Exception as e:
+            print(f"Error adding enhanced alpha factors: {e}")
+    
+    # Display comprehensive summary
+    all_alpha_cols = [col for col in all_df.columns if col.startswith('alpha_')]
+    print(f"\n" + "="*60)
+    print("COMPREHENSIVE ALPHA FACTOR SUMMARY")
+    print("="*60)
+    print(f"Total alpha factors available: {len(all_alpha_cols)}")
+    print("Alpha factor breakdown:")
+    print(f"  🎯 Original WorldQuant alphas (1-101): 101 factors")
+    
+    research_alphas = [col for col in all_alpha_cols if 102 <= int(col.split('_')[1]) <= 120]
+    if research_alphas:
+        print(f"  📚 Research-based alphas (102-120): {len(research_alphas)} factors") 
+        
+    enhanced_alphas = [col for col in all_alpha_cols if 121 <= int(col.split('_')[1]) <= 140]
+    if enhanced_alphas:
+        print(f"  ⚡ Enhanced simple alphas (121-140): {len(enhanced_alphas)} factors")
+        
+    print(f"  📊 Grand total: {len(all_alpha_cols)} alpha factors")
+    
+    if len(enhanced_alphas) > 0:
+        print(f"\n🚀 Key innovation: Enhanced factors follow alpha_101's success pattern")
+        print(f"   - Simple, robust formulations")
+        print(f"   - Volatility normalization") 
+        print(f"   - Focus on intraday patterns")
+        print(f"   - Minimal parameter complexity")
+    
+    print(f"Final DataFrame shape: {all_df.shape}")
     
     # Save the results
     all_df.to_csv('data/alpha_factors_results.csv', index=False)
