@@ -214,56 +214,123 @@ def evaluate_alpha_performance(df, alpha_columns, forward_return_period=5):
     print(f"Successfully evaluated {len(performance_df)} alpha factors")
     return performance_df, df_valid
 
-def build_combined_alpha_strategy(df, performance_df, top_n=20):
-    """Build combined alpha strategy using top-performing factors"""
+def build_combined_alpha_strategy(df, performance_df, top_n=20,
+                                  mode='equal_mean', long_frac=0.3, short_frac=0.3):
+    """Build combined alpha strategy using top-performing factors.
+
+    Weighting modes for fair benchmark comparison:
+    - 'equal_mean' (legacy): mean of position returns across all assets (variable exposure)
+    - 'long_only': use only the long side; re-normalize long weights to sum to 1 each day
+    - 'long_short_gross1': dollar-neutral; allocate 0.5 to longs and 0.5 to shorts daily
+
+    Args:
+        df: Data with prices and alpha columns
+        performance_df: Ranked factors with column 'alpha'
+        top_n: number of factors to combine
+        mode: weighting mode as described above
+        long_frac/short_frac: fraction of universe to select for long/short buckets
+    """
     print(f"\nBuilding combined alpha strategy with top {top_n} alpha factors...")
-    
+
     # Select top alphas based on absolute IC
     top_alphas = performance_df.head(top_n)['alpha'].tolist()
     print(f"Selected top alphas: {top_alphas[:5]}... (showing first 5)")
-    
-    # Calculate combined alpha score (equal weighted approach)
+
+    # Calculate combined alpha score (equal-weight across factors)
+    df = df.copy()
     df['combined_alpha'] = df[top_alphas].mean(axis=1)
-    
-    # Create portfolio returns using long-short strategy
+
+    # Build daily weights
     portfolio_data = []
-    
-    for date in df['Date'].unique():
-        date_data = df[df['Date'] == date].copy()
-        
-        if len(date_data) < 2:  # Need at least 2 assets for ranking
+
+    long_threshold = 1 - long_frac
+    short_threshold = short_frac
+
+    for date, date_data in df.groupby('Date'):
+        date_data = date_data.copy()
+        if len(date_data) < 2:
             continue
-            
-        # Rank assets by combined alpha score
+
+        # Cross-sectional rank of combined alpha
         date_data['alpha_rank'] = date_data['combined_alpha'].rank(pct=True, method='first')
-        
-        # Long top 30%, short bottom 30% (following golden copy strategy)
-        long_threshold = 0.7
-        short_threshold = 0.3
-        
-        date_data['position'] = 0
-        date_data.loc[date_data['alpha_rank'] >= long_threshold, 'position'] = 1
-        date_data.loc[date_data['alpha_rank'] <= short_threshold, 'position'] = -1
-        
+
+        # Raw selection masks
+        long_mask = date_data['alpha_rank'] >= long_threshold
+        short_mask = date_data['alpha_rank'] <= short_threshold
+
+        # Initialize weight column
+        date_data['weight'] = 0.0
+
+        if mode == 'equal_mean':
+            # Legacy: +/-1 positions; return computed later as mean across all assets
+            date_data.loc[long_mask, 'weight'] = 1.0
+            date_data.loc[short_mask, 'weight'] = -1.0
+
+        elif mode == 'long_only':
+            # Only use longs; re-normalize to sum to 1 each day
+            n_long = int(long_mask.sum())
+            if n_long > 0:
+                # Equal-weight the long bucket to sum to 1.0
+                eq_w = 1.0 / n_long
+                date_data.loc[long_mask, 'weight'] = eq_w
+            # shorts remain 0
+
+        elif mode == 'long_short_gross1':
+            # Dollar-neutral with gross exposure = 1 (0.5 long / 0.5 short)
+            n_long = int(long_mask.sum())
+            n_short = int(short_mask.sum())
+            if n_long > 0:
+                date_data.loc[long_mask, 'weight'] = 0.5 / n_long
+            if n_short > 0:
+                date_data.loc[short_mask, 'weight'] = -(0.5 / n_short)
+
+        else:
+            raise ValueError(f"Unknown weighting mode: {mode}")
+
         portfolio_data.append(date_data)
-    
+
     portfolio_df = pd.concat(portfolio_data, ignore_index=True)
-    
-    # Calculate strategy returns
+
+    # Compute asset returns
     portfolio_df = portfolio_df.sort_values(['Ticker', 'Date'])
     portfolio_df['asset_return'] = portfolio_df.groupby('Ticker')['Close'].pct_change()
-    portfolio_df['position_return'] = portfolio_df['position'] * portfolio_df['asset_return']
-    
-    # Daily strategy return (mean of all position returns)
-    daily_returns = portfolio_df.groupby('Date').agg({
-        'position_return': 'mean',
-        'position': lambda x: (x != 0).sum()  # Number of active positions
-    }).reset_index()
-    
-    daily_returns.columns = ['Date', 'strategy_return', 'num_positions']
-    daily_returns = daily_returns[daily_returns['num_positions'] > 0]  # Only days with positions
-    
-    print(f"Combined alpha strategy created with {len(daily_returns)} trading days")
+
+    # Compute daily PnL using weights
+    portfolio_df['weighted_return'] = portfolio_df['weight'] * portfolio_df['asset_return']
+
+    agg = {
+        'weighted_return': 'sum',
+        'weight': ['sum', lambda x: x.abs().sum(),
+                   lambda x: (x > 0).sum(), lambda x: (x < 0).sum()]
+    }
+    daily = portfolio_df.groupby('Date').agg(agg)
+    # Flatten columns
+    daily.columns = ['strategy_return', 'net_exposure', 'gross_exposure', 'n_longs', 'n_shorts']
+    daily = daily.reset_index()
+
+    # Legacy mode parity: keep num_positions similar for downstream
+    if mode == 'equal_mean':
+        # Reproduce earlier averaging across all assets (variable exposure)
+        # Note: This branch keeps behavior for backward compatibility.
+        portfolio_df['position_return'] = portfolio_df['weight'] * portfolio_df['asset_return']
+        legacy = portfolio_df.groupby('Date').agg({
+            'position_return': 'mean',
+            'weight': lambda x: (x != 0).sum()
+        }).reset_index().rename(columns={'position_return': 'strategy_return', 'weight': 'num_positions'})
+        legacy = legacy[legacy['num_positions'] > 0]
+        print(f"Combined alpha strategy created with {len(legacy)} trading days (mode={mode})")
+        return legacy[['Date', 'strategy_return', 'num_positions']], top_alphas, portfolio_df
+
+    # For normalized modes, add diagnostics
+    daily['num_positions'] = daily['n_longs'] + daily['n_shorts']
+    print(
+        f"Combined alpha strategy created with {len(daily)} trading days (mode={mode}).\n"
+        f"Avg gross: {daily['gross_exposure'].mean():.3f}, Avg net: {daily['net_exposure'].mean():.3f}, "
+        f"Avg longs: {daily['n_longs'].mean():.1f}, Avg shorts: {daily['n_shorts'].mean():.1f}"
+    )
+
+    # Align return schema with downstream consumers
+    daily_returns = daily[['Date', 'strategy_return', 'num_positions']]
     return daily_returns, top_alphas, portfolio_df
 
 def calculate_btc_benchmark(df):
@@ -1489,7 +1556,12 @@ def main():
             print("❌ No valid factors for comprehensive analysis")
         
         # 7. Build combined alpha strategy
-        strategy_returns, top_alphas, portfolio_df = build_combined_alpha_strategy(df_valid, performance_df)
+        # To compare fairly with a long-only BTC benchmark, default to long-only normalized weights.
+        strategy_mode = 'long_only'  # options: 'long_only', 'long_short_gross1', 'equal_mean'
+        strategy_returns, top_alphas, portfolio_df = build_combined_alpha_strategy(
+            df_valid, performance_df, top_n=20, mode=strategy_mode, long_frac=0.3, short_frac=0.3
+        )
+        print(f"Using strategy weighting mode: {strategy_mode}")
         
         # 8. Calculate BTC buy-and-hold benchmark using the same validated data
         btc_data = calculate_btc_benchmark(df_valid)
