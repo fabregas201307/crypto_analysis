@@ -1,6 +1,9 @@
 # Data folder - ignore all data files
 data/
 
+.DS_Store
+.vscode/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
