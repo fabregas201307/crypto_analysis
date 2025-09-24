@@ -1351,157 +1351,7 @@ def create_strategy_visualization(strategy_returns, btc_data, performance_df, to
     plt.show()
     
     return merged_data
-    plt.close('all')  # Clear any existing plots
-    
-    # Create figure with subplots
-    fig = plt.figure(figsize=(20, 16))
-    fig.suptitle('Extended Alpha Strategy vs BTC Buy-and-Hold Analysis', 
-                 fontsize=18, fontweight='bold', y=0.98)
-    
-    # Create grid layout
-    gs = fig.add_gridspec(3, 2, height_ratios=[1.5, 1, 1], hspace=0.3, wspace=0.3)
-    
-    # Plot 1: Strategy vs BTC Cumulative Performance (Full Width)
-    ax1 = fig.add_subplot(gs[0, :])
-    
-    # Merge strategy and BTC data for comparison
-    print(f"Strategy returns: {len(strategy_returns)} days")
-    print(f"BTC benchmark: {len(btc_data)} days")
-    merged_data = strategy_returns.merge(btc_data, on='Date', how='inner')
-    print(f"Merged data: {len(merged_data)} overlapping days")
-    
-    # Always plot strategy returns with proper timestamps
-    strategy_clean = strategy_returns.dropna(subset=['strategy_return'])
-    if len(strategy_clean) > 0:
-        strategy_cumulative = (1 + strategy_clean['strategy_return']).cumprod()
-        ax1.plot(pd.to_datetime(strategy_clean['Date']), strategy_cumulative, 
-                label='Extended Alpha Strategy', linewidth=3, color='red', alpha=0.9)
-        print(f"✓ Strategy performance plotted: {len(strategy_cumulative)} data points")
-        
-        # Set proper date formatting for x-axis
-        import matplotlib.dates as mdates
-        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-        ax1.xaxis.set_major_locator(mdates.YearLocator())
-        ax1.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))  # January and July
-        plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
-    else:
-        print("✗ No valid strategy returns data to plot")
-    
-    # Plot BTC benchmark if available and overlapping
-    if len(merged_data) > 0:
-        btc_cumulative = (1 + merged_data['btc_return']).cumprod()
-        ax1.plot(pd.to_datetime(merged_data['Date']), btc_cumulative, 
-                label='BTC Buy-and-Hold', linewidth=3, color='orange', alpha=0.8)
-        print(f"✓ BTC benchmark plotted: {len(btc_cumulative)} data points")
-    else:
-        # If no overlapping data, try to plot BTC separately if available
-        if len(btc_data) > 0:
-            btc_clean = btc_data.dropna(subset=['btc_return'])
-            if len(btc_clean) > 0:
-                btc_cumulative = (1 + btc_clean['btc_return']).cumprod()
-                ax1.plot(pd.to_datetime(btc_clean['Date']), btc_cumulative, 
-                        label='BTC Buy-and-Hold', linewidth=3, color='orange', alpha=0.8)
-                print(f"✓ BTC benchmark plotted separately: {len(btc_cumulative)} data points")
-        print("✗ No overlapping data between strategy and BTC benchmark")
-    
-    ax1.set_title('Extended Alpha Strategy vs BTC Buy-and-Hold - Cumulative Returns', 
-                  fontweight='bold', fontsize=14)
-    ax1.set_ylabel('Cumulative Return', fontsize=12)
-    ax1.legend(loc='upper left', fontsize=12)
-    ax1.grid(True, alpha=0.3)
-    ax1.set_yscale('log')  # Log scale to show performance differences better
-    
-    # Plot 2: Top Alpha Factors Performance
-    ax2 = fig.add_subplot(gs[1, 0])
-    top_15 = performance_df.head(15)
-    bars = ax2.barh(range(len(top_15)), top_15['abs_ic'], color='green', alpha=0.7)
-    ax2.set_yticks(range(len(top_15)))
-    ax2.set_yticklabels([f"{alpha}" for alpha in top_15['alpha']], fontsize=10)
-    ax2.set_title('Top 15 Alpha Factors (by |IC|)', fontweight='bold')
-    ax2.set_xlabel('Absolute Information Coefficient')
-    ax2.grid(True, alpha=0.3)
-    
-    # Add values on bars
-    for i, bar in enumerate(bars):
-        width = bar.get_width()
-        ax2.text(width, bar.get_y() + bar.get_height()/2,
-                f'{width:.4f}', ha='left', va='center', fontsize=8)
-    
-    # Plot 3: Return Distribution Comparison
-    ax3 = fig.add_subplot(gs[1, 1])
-    if len(merged_data) > 0:
-        ax3.hist(merged_data['strategy_return'], bins=50, alpha=0.7, color='red', 
-                label='Alpha Strategy', density=True)
-        ax3.hist(merged_data['btc_return'], bins=50, alpha=0.7, color='orange', 
-                label='BTC Returns', density=True)
-        ax3.set_title('Daily Return Distributions', fontweight='bold')
-        ax3.set_xlabel('Daily Return')
-        ax3.set_ylabel('Density')
-        ax3.legend()
-        ax3.grid(True, alpha=0.3)
-    
-    # Plot 4: Rolling Performance Comparison
-    ax4 = fig.add_subplot(gs[2, 0])
-    if len(merged_data) > 0 and len(merged_data) >= 252:  # At least 1 year of data
-        # Calculate rolling 252-day (1-year) returns
-        strategy_rolling = merged_data['strategy_return'].rolling(252).apply(
-            lambda x: (1 + x).prod() - 1)
-        btc_rolling = merged_data['btc_return'].rolling(252).apply(
-            lambda x: (1 + x).prod() - 1)
-        
-        ax4.plot(merged_data['Date'], strategy_rolling, 
-                label='Alpha Strategy (1Y Rolling)', color='red', alpha=0.8)
-        ax4.plot(merged_data['Date'], btc_rolling, 
-                label='BTC (1Y Rolling)', color='orange', alpha=0.8)
-        ax4.set_title('Rolling 1-Year Returns', fontweight='bold')
-        ax4.set_ylabel('1-Year Return')
-        ax4.legend()
-        ax4.grid(True, alpha=0.3)
-    else:
-        ax4.text(0.5, 0.5, 'Insufficient data for rolling analysis', 
-                ha='center', va='center', transform=ax4.transAxes, fontsize=12)
-    
-    # Plot 5: Factor Category Analysis
-    ax5 = fig.add_subplot(gs[2, 1])
-    categories = {
-        'Original (1-101)': [f'alpha_{i}' for i in range(1, 102)],
-        'Research (102-120)': [f'alpha_{i}' for i in range(102, 121)],
-        'Enhanced (121-140)': [f'alpha_{i}' for i in range(121, 141)],
-        'Extended (141-160)': [f'alpha_{i}' for i in range(141, 161)]
-    }
-    
-    category_performance = {}
-    for category, alpha_list in categories.items():
-        category_alphas = performance_df[performance_df['alpha'].isin(alpha_list)]
-        if len(category_alphas) > 0:
-            category_performance[category] = category_alphas['abs_ic'].mean()
-    
-    if category_performance:
-        category_names = list(category_performance.keys())
-        category_scores = list(category_performance.values())
-        
-        bars = ax5.bar(category_names, category_scores, 
-                      color=['blue', 'green', 'orange', 'red'], alpha=0.7)
-        ax5.set_title('Average |IC| by Factor Category', fontweight='bold')
-        ax5.set_ylabel('Average |IC|')
-        ax5.tick_params(axis='x', rotation=15)
-        
-        # Add value labels on bars
-        for bar, score in zip(bars, category_scores):
-            height = bar.get_height()
-            ax5.text(bar.get_x() + bar.get_width()/2., height,
-                     f'{score:.4f}', ha='center', va='bottom', fontsize=10)
-    
-    plt.tight_layout()
-    
-    # Save the plot
-    plot_filename = "data/crypto_strategy_analysis.png"
-    plt.savefig(plot_filename, dpi=300, bbox_inches='tight', facecolor='white')
-    print(f"\n📊 Strategy analysis plot saved to: {plot_filename}")
-    
-    plt.show()
-    
-    return merged_data
+
 
 def main():
     """Main execution function for crypto strategy analysis"""
@@ -1562,6 +1412,29 @@ def main():
             df_valid, performance_df, top_n=20, mode=strategy_mode, long_frac=0.3, short_frac=0.3
         )
         print(f"Using strategy weighting mode: {strategy_mode}")
+
+        # Export per-asset daily weights and daily exposure diagnostics
+        try:
+            weights_out = "data/extended_strategy_weights.csv"
+            exposure_out = "data/extended_strategy_daily_exposure.csv"
+
+            # Minimal per-asset weight table
+            cols = ['Date', 'Ticker', 'weight', 'alpha_rank', 'combined_alpha']
+            export_cols = [c for c in cols if c in portfolio_df.columns]
+            portfolio_df.sort_values(['Date', 'Ticker'])[export_cols].to_csv(weights_out, index=False)
+
+            # Daily exposure summary
+            daily_exposure = portfolio_df.groupby('Date').agg(
+                net_exposure=('weight', 'sum'),
+                gross_exposure=('weight', lambda x: x.abs().sum()),
+                n_longs=('weight', lambda x: (x > 0).sum()),
+                n_shorts=('weight', lambda x: (x < 0).sum())
+            ).reset_index()
+            daily_exposure.to_csv(exposure_out, index=False)
+            print(f"Weights exported to: {weights_out}")
+            print(f"Daily exposure exported to: {exposure_out}")
+        except Exception as e:
+            print(f"Warning: failed to export weights/exposure CSVs: {e}")
         
         # 8. Calculate BTC buy-and-hold benchmark using the same validated data
         btc_data = calculate_btc_benchmark(df_valid)
