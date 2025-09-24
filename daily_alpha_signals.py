@@ -300,4 +300,3 @@ if __name__ == '__main__':
 
 
 # . /Users/kaiwen/miniconda3/etc/profile.d/conda.sh && conda activate jpm && python /Users/kaiwen/Desktop/projects/crypto_analysis/daily_alpha_signals.py --input /Users/kaiwen/Desktop/projects/crypto_analysis/data/Binance_AllCrypto_d.csv --lag-days 0 --mode long_only
-
