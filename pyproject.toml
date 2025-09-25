@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "crypto-analysis"
+version = "0.1.0"
+description = "A crypto alpha analysis and signal generation pipeline."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Your Name", email = "you@example.com" }
+]
+
+dependencies = [
+    "pandas",
+    "numpy",
+    "requests",
+    "ccxt",
+    "matplotlib",
+    # TA-Lib is a common dependency, but requires system libraries.
+    # It's often easier to install it separately.
+    # "TA-Lib", 
+]
+
+[project.scripts]
+run-pipeline = "crypto_analysis.run_pipeline:main"
