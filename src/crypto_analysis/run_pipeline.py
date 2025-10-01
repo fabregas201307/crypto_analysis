@@ -16,6 +16,12 @@ import subprocess
 import sys
 from datetime import datetime
 
+# Compute project root and src path so that subprocesses can import the package
+_THIS_FILE = os.path.abspath(__file__)
+_SRC_DIR = os.path.dirname(os.path.dirname(_THIS_FILE))  # .../src
+_PROJECT_ROOT = os.path.dirname(_SRC_DIR)
+_PKG_SRC_PATH = _SRC_DIR  # path we need on PYTHONPATH for child processes
+
 DATA_FILE = "data/Binance_AllCrypto_d.csv"
 DOWNLOAD_MODULE = "crypto_analysis.crypto_data_download"
 SIGNAL_MODULE = "crypto_analysis.daily_alpha_signals"
@@ -35,15 +41,29 @@ def get_latest_date(file_path: str) -> pd.Timestamp | None:
         return None
 
 def run_script(module_name: str, *args):
-    """Executes a Python module in the same environment and handles errors."""
+    """Executes a Python module in the same environment and handles errors.
+
+    Ensures the "src" directory is on PYTHONPATH for the child process so that
+    the package works even if the user has NOT done `pip install -e .`.
+    """
     print(f"\n{'='*20} RUNNING: {module_name} {'='*20}")
     try:
+        # Prepare environment inheriting current variables
+        env = os.environ.copy()
+        existing_pp = env.get("PYTHONPATH", "")
+        paths = [p for p in existing_pp.split(os.pathsep) if p]
+        if _PKG_SRC_PATH not in paths:
+            # Prepend so it takes precedence
+            new_pp = _PKG_SRC_PATH if not existing_pp else _PKG_SRC_PATH + os.pathsep + existing_pp
+            env["PYTHONPATH"] = new_pp
         # Use sys.executable to ensure the same Python interpreter is used
         process = subprocess.run(
             [sys.executable, "-m", module_name, *args],
             check=True,
             capture_output=True,
-            text=True
+            text=True,
+            env=env,
+            cwd=_PROJECT_ROOT,
         )
         print(process.stdout)
         if process.stderr:

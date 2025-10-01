@@ -34,9 +34,16 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-# Ensure local imports resolve
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(THIS_DIR)
+# --- Path bootstrap -------------------------------------------------------
+# Allow running this file directly (python src/crypto_analysis/daily_alpha_signals.py)
+# without requiring an editable install by ensuring the project src root is on sys.path.
+_THIS_FILE = os.path.abspath(__file__)
+_PKG_DIR = os.path.dirname(_THIS_FILE)              # .../src/crypto_analysis
+_SRC_DIR = os.path.dirname(_PKG_DIR)                # .../src
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
+
+# (No need to append THIS_DIR; package imports now resolve via _SRC_DIR)
 
 # Import factor generation from research module (optional, only if --full-factors is used)
 try:
